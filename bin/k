@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+K_TOOL_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+LIB_DIR="${K_TOOL_ROOT}/lib"
+
+# shellcheck source=../lib/common.sh
+source "${LIB_DIR}/common.sh"
+source "${LIB_DIR}/git.sh"
+source "${LIB_DIR}/scope.sh"
+source "${LIB_DIR}/template.sh"
+source "${LIB_DIR}/journal.sh"
+source "${LIB_DIR}/todo.sh"
+source "${LIB_DIR}/entry.sh"
+source "${LIB_DIR}/resume.sh"
+source "${LIB_DIR}/setup.sh"
+source "${LIB_DIR}/find.sh"
+
+usage() {
+  cat <<'USAGE'
+k - git-based CLI knowledge system (bash v1)
+
+Usage:
+  k help
+  k setup [path]
+  k scope list|show|use <scope>|clear
+  k jot [--kind KIND] [--scope SCOPE] [--tags a,b,c] <text>
+  k today [--edit]
+  k resume [--scope SCOPE]
+  k new <type> <title> [--scope SCOPE] [--tags a,b,c] [--edit]
+  k save [--file draft.md] [--tags a,b,c]
+  k todo add <title> [--scope SCOPE] [--priority low|medium|high] [--tags a,b,c]
+  k todo list [--scope SCOPE]
+  k todo done <index> [--scope SCOPE]
+  k wrap
+  k find <query>
+
+Examples:
+  k setup .
+  k scope use private/arx
+  k jot "Traefik auth vermutlich Middleware-Name"
+  k jot --kind question "Warum greift die Middleware nicht?"
+  k todo add "Middleware-Namen prüfen"
+  k new problem "Traefik auth greift nicht" --edit
+  k save --tags infra,traefik,auth
+  k wrap
+USAGE
+}
+
+require_repo_unless_setup() {
+  local cmd="$1"
+  case "$cmd" in
+    help|-h|--help|setup) return 0 ;;
+    *) k_repo_root >/dev/null ;;
+  esac
+}
+
+cmd_setup() {
+  local path="${1:-.}"
+  k_setup_run "$path"
+}
+
+cmd_scope() {
+  local sub="${1:-}"
+  shift || true
+  case "$sub" in
+    list) k_scope_list ;;
+    show) k_scope_show ;;
+    use) [[ $# -ge 1 ]] || k_die "Usage: k scope use <scope>" 2; k_scope_use "$1" ;;
+    clear) k_scope_clear ;;
+    *) k_die "Usage: k scope list|show|use <scope>|clear" 2 ;;
+  esac
+}
+
+cmd_jot() {
+  local kind="note" scope="" tags="" text=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --kind) kind="$2"; shift 2 ;;
+      --scope) scope="$2"; shift 2 ;;
+      --tags) tags="$2"; shift 2 ;;
+      --*) k_die "Unknown option: $1" 2 ;;
+      *) text="${text:+$text }$1"; shift ;;
+    esac
+  done
+  [[ -n "$text" ]] || k_die "Usage: k jot [--kind KIND] [--scope SCOPE] [--tags a,b,c] <text>" 2
+  case "$kind" in note|question|todo) ;; *) k_die "Invalid kind: $kind" 2 ;; esac
+  [[ -n "$scope" ]] || scope="$(k_get_current_scope || true)"
+  local file
+  file="$(k_journal_append "$kind" "$scope" "$tags" "$text")"
+  k_git_commit_if_enabled "journal(${kind}): ${text:0:60}"
+  printf 'Appended to %s\n' "$file"
+}
+
+cmd_today() {
+  if [[ "${1:-}" == "--edit" ]]; then
+    k_journal_edit_today
+  else
+    k_journal_show_today
+  fi
+}
+
+cmd_resume() {
+  local scope=""
+  if [[ "${1:-}" == "--scope" ]]; then
+    scope="$2"
+  fi
+  [[ -n "$scope" ]] || scope="$(k_require_scope)"
+  k_resume_show "$scope"
+}
+
+cmd_new() {
+  local type="${1:-}"; shift || true
+  local title="${1:-}"; shift || true
+  [[ -n "$type" && -n "$title" ]] || k_die "Usage: k new <type> <title> [--scope SCOPE] [--tags a,b,c] [--edit]" 2
+  local scope="" tags="" edit="false"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --scope) scope="$2"; shift 2 ;;
+      --tags) tags="$2"; shift 2 ;;
+      --edit) edit="true"; shift ;;
+      --*) k_die "Unknown option: $1" 2 ;;
+      *) k_die "Unexpected argument: $1" 2 ;;
+    esac
+  done
+  [[ -n "$scope" ]] || scope="$(k_require_scope)"
+  local file
+  file="$(k_entry_create_draft "$type" "$title" "$scope" "$tags")"
+  printf 'Created draft: %s\n' "$file"
+  [[ "$edit" == "true" ]] && k_open_editor "$file"
+}
+
+cmd_save() {
+  local file="" tags=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --file) file="$2"; shift 2 ;;
+      --tags) tags="$2"; shift 2 ;;
+      --*) k_die "Unknown option: $1" 2 ;;
+      *) k_die "Unexpected argument: $1" 2 ;;
+    esac
+  done
+  [[ -n "$file" ]] || file="$(k_entry_find_latest_draft || true)"
+  [[ -n "$file" ]] || k_die "No draft found" 4
+  local final_file type title normalized_tags msg
+  final_file="$(k_entry_finalize_draft "$file" "$tags")"
+  type="$(k_entry_frontmatter_get "$final_file" type)"
+  title="$(k_entry_frontmatter_get "$final_file" title)"
+  normalized_tags="$(k_entry_frontmatter_get "$final_file" tags | sed -E 's/^\[//; s/\]$//; s/, /,/g')"
+  if [[ -n "$normalized_tags" ]]; then
+    msg="${type}(${normalized_tags}): ${title}"
+  else
+    msg="${type}: ${title}"
+  fi
+  k_git_commit_if_enabled "$msg"
+  printf 'Saved entry: %s\n' "$final_file"
+}
+
+cmd_todo() {
+  local sub="${1:-}"; shift || true
+  case "$sub" in
+    add)
+      local title="${1:-}"; shift || true
+      [[ -n "$title" ]] || k_die "Usage: k todo add <title> [--scope SCOPE] [--priority low|medium|high] [--tags a,b,c]" 2
+      local scope="" priority="medium" tags=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --scope) scope="$2"; shift 2 ;;
+          --priority) priority="$2"; shift 2 ;;
+          --tags) tags="$2"; shift 2 ;;
+          --*) k_die "Unknown option: $1" 2 ;;
+          *) k_die "Unexpected argument: $1" 2 ;;
+        esac
+      done
+      [[ -n "$scope" ]] || scope="$(k_require_scope)"
+      local added
+      added="$(k_todo_add "$scope" "$title" "$priority" "$tags")"
+      k_git_commit_if_enabled "todo(add): $added"
+      printf 'Added todo in %s: %s\n' "$scope" "$added"
+      ;;
+    list)
+      local scope=""
+      if [[ "${1:-}" == "--scope" ]]; then
+        scope="$2"
+      fi
+      [[ -n "$scope" ]] || scope="$(k_require_scope)"
+      k_todo_list "$scope"
+      ;;
+    done)
+      local index="${1:-}"; shift || true
+      [[ -n "$index" ]] || k_die "Usage: k todo done <index> [--scope SCOPE]" 2
+      local scope=""
+      if [[ "${1:-}" == "--scope" ]]; then
+        scope="$2"
+      fi
+      [[ -n "$scope" ]] || scope="$(k_require_scope)"
+      local done_title
+      done_title="$(k_todo_done_by_index "$scope" "$index")"
+      k_git_commit_if_enabled "todo(done): $done_title"
+      printf 'Done in %s: %s\n' "$scope" "$done_title"
+      ;;
+    *)
+      k_die "Usage: k todo add|list|done ..." 2
+      ;;
+  esac
+}
+
+cmd_wrap() {
+  local progress open next text
+  printf 'Wichtigster Fortschritt?\n> '
+  IFS= read -r progress
+  printf 'Was ist noch offen?\n> '
+  IFS= read -r open
+  printf 'Was ist der nächste Schritt?\n> '
+  IFS= read -r next
+  text="Fortschritt: ${progress}. Offen: ${open}. Nächster Schritt: ${next}."
+  local file
+  file="$(k_journal_append "wrap" "" "" "$text")"
+  k_git_commit_if_enabled "journal(wrap): daily wrap"
+  printf 'Wrap written to %s\n' "$file"
+}
+
+cmd_find() {
+  local query="$*"
+  [[ -n "$query" ]] || k_die "Usage: k find <query>" 2
+  k_find_run "$query"
+}
+
+main() {
+  local cmd="${1:-help}"
+  shift || true
+  require_repo_unless_setup "$cmd"
+  case "$cmd" in
+    help|-h|--help) usage ;;
+    setup) cmd_setup "$@" ;;
+    scope) cmd_scope "$@" ;;
+    jot) cmd_jot "$@" ;;
+    today) cmd_today "$@" ;;
+    resume) cmd_resume "$@" ;;
+    new) cmd_new "$@" ;;
+    save) cmd_save "$@" ;;
+    todo) cmd_todo "$@" ;;
+    wrap) cmd_wrap "$@" ;;
+    find) cmd_find "$@" ;;
+    *) k_die "Unknown command: $cmd" 2 ;;
+  esac
+}
+
+main "$@"

@@ -1,0 +1,7 @@
+# {{title}}
+
+## Beobachtung
+
+## Bedeutung
+
+## Konsequenz
