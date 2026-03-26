@@ -1,105 +1,90 @@
-# Projekt: k – CLI Knowledge System
+# k
 
-## Überblick
+`k` is a lightweight, git-based CLI system for capturing, structuring, and reusing knowledge.
 
-**k** ist ein leichtgewichtiges, git-basiertes CLI-Tool zur Erfassung, Strukturierung und Wiederverwendung von Wissen.
+It is designed to be:
+- shell-first
+- low-friction for daily use
+- file-based and editor-agnostic
+- explicit about context through scopes
 
-Ziel ist es, ein System zu schaffen, das:
-- im Alltag tatsächlich benutzt wird
-- minimale Reibung beim Erfassen hat
-- Kontextverlust reduziert
-- vollständig dateibasiert und tool-agnostisch ist
+## Core Idea
 
----
+`k` is not a database and not a notebook platform.
 
-## Kernidee
+> `k` is a workflow wrapper around Markdown + Git.
 
-k ist kein neues Datenbanksystem und kein Notion-Klon.
+It combines:
+- journal notes for raw thinking
+- entries for structured knowledge
+- todos for concrete next actions
+- scopes for explicit context
 
-> k ist ein Workflow-Wrapper um Markdown + Git.
+## Storage Layout
 
-Es kombiniert:
-- Journal (Denken)
-- Entries (Wissen)
-- Todos (Handlung)
-- Scope (Kontext)
+Repository content lives in `~/.k/repo`:
 
----
-
-## Ziele
-
-### Primär
-
-- Schnelles Erfassen von Gedanken (\`k jot\`)
-- Kontext wiederfinden (\`k resume\`)
-- Tagesabschluss erzwingen (\`k wrap\`)
-- Wissen strukturiert ablegen (\`k new\` + \`k save\`)
-
-### Sekundär
-
-- Shell-first Nutzung
-- Editor-agnostisch
-- Git als Historie
-- Offline-first
-
----
-
-## Nicht-Ziele (v1)
-
-- Keine GUI
-- Keine Datenbank
-- Keine Cloud-Synchronisation
-- Keine AI-Integration
-- Kein komplexes Task-Management
-
----
-
-## Konzepte
-
-### 1. Journal
-
-- global pro Tag
-- append-only
-- enthält rohe Gedanken
-
-Beispiel:
-
-```md
-## 20:41 [question] [scope:work/bgprevent]
-Wie modellieren wir UUID außen und Long innen?
+```text
+~/.k/repo/
+  journal/
+  entries/
+  drafts/
+  todos/
 ```
 
----
+Local metadata lives in `~/.k/.knowledge`:
 
-### 2. Entries
+```text
+~/.k/.knowledge/
+  config
+  current_scope
+  scopes.txt
+  tags.txt
+  templates/
+```
 
-Strukturierte Wissenseinträge:
+`.knowledge` is local configuration and metadata.
 
-- problem
-- solution
-- insight
-- decision
-- idea
-- project
+## Concepts
 
-Diese sind:
-- kuratiert
-- versioniert
-- wiederverwendbar
+### Journal
 
----
+- one file per day
+- append-first
+- used for quick capture
 
-### 3. Todos
+Example:
 
-- scope-basiert
-- konkrete nächste Schritte
-- getrennt vom Journal
+```md
+## 20:41 [question] [scope:work/project1-work]
+How should we model UUID externally and Long internally?
+```
 
----
+### Entries
 
-### 4. Scope
+Structured knowledge entries:
 
-Kontextanker für alles.
+- `problem`
+- `solution`
+- `insight`
+- `decision`
+- `idea`
+- `project`
+
+Drafts are created first and finalized later.
+
+### Todos
+
+Todos are scope-based and stored separately from the journal.
+
+The current workflow supports:
+- `Open`
+- `In Progress`
+- `Done`
+
+### Scope
+
+Scope is the context anchor for most commands.
 
 Format:
 
@@ -107,163 +92,162 @@ Format:
 <domain>/<system>
 ```
 
-Beispiele:
+Examples:
 
-- private/arx
-- work/bgprevent
-- shared/git
+- `private/project1`
+- `work/project1-work`
+- `common/git`
 
----
-
-## Architektur
-
-### Dateibasiert
-
-Alle Daten liegen als Markdown im Repository.
-
-```text
-knowledge/
-  journal/
-  entries/
-  drafts/
-  todos/
-  .knowledge/
-```
-
----
-
-### Git als Backbone
-
-Git übernimmt:
-- Historie
-- Versionierung
-- Sync
-
-k übernimmt:
-- Struktur
-- Defaults
-- Workflow
-
----
-
-## CLI Design
-
-### Prinzipien
-
-- kurze Befehle
-- wenig Argumente
-- sinnvolle Defaults
-- shell-friendly
-
----
-
-### Kernbefehle
+## Commands
 
 ```bash
-k scope use private/arx
-k resume
+k setup
+
+k scope list
+k scope show
+k scope use private/project1
+k scope clear
+
+k draft list
+k draft list --scope private/project1
+
 k jot "text"
-k new problem "title"
-k save
-k todo add "task"
-k wrap
+k jot --kind question "text"
+k jot --kind todo --scope work/project1-work "text"
+
 k today
+k today --edit
+k resume
+k resume --scope common/git
+
+k new problem "title" --edit
+k save --latest
+k save --file ~/.k/repo/drafts/2026-03-26-1015-sample.md
+
+k todo add "task"
+k todo list
+k todo start
+k todo done 0
+k todo reopen
+
+k wrap
 k find query
 ```
 
----
+Global verbosity flags:
+
+```bash
+k -v setup
+k -vv setup
+k -vvv setup
+```
+
+## Current Workflow
+
+### Setup
+
+`k setup` creates the canonical repository at `~/.k/repo` and local metadata at `~/.k/.knowledge`.
+
+During setup, `k` currently:
+- prepares the repository structure
+- optionally initializes Git
+- optionally configures the `origin` remote
+- sets the environment name
+- optionally sets a default scope
+- installs default templates
+
+### Capture
+
+Use `jot` for low-friction capture:
+
+```bash
+k jot "Quick thought"
+k jot --kind question "Why does this fail?"
+k jot --kind todo "Check middleware name"
+```
+
+### Structured Knowledge
+
+Create a draft entry and finalize it later:
+
+```bash
+k new problem "Traefik auth does not apply" --edit
+k draft list
+k save --latest --tags infra,traefik,auth
+```
+
+### Todo Workflow
+
+The current todo flow is:
+
+```bash
+k todo add "Investigate auth issue"
+k todo start
+k todo done
+k todo reopen
+```
+
+If no index is given, `0` is treated as the default and resolves to the first item in the relevant section.
+
+### Resume
+
+`k resume` currently shows:
+- the active scope
+- todo counts
+- recent journal lines for the scope from today
+- in-progress todos
+- open todos
+- matching drafts
+- the latest matching finalized entry
+- the latest wrap from today
+
+This is the current implementation, not a full historical context reconstruction yet.
 
 ## Templates
 
-Templates liegen in:
+Templates are stored in:
 
 ```text
-.knowledge/templates/
+~/.k/.knowledge/templates/
 ```
 
-Bestehend aus:
-- header.md
-- problem.md
-- solution.md
-- insight.md
-- decision.md
-- idea.md
-- project.md
+The default set is:
+- `header.md`
+- `problem.md`
+- `solution.md`
+- `insight.md`
+- `decision.md`
+- `idea.md`
+- `project.md`
 
-Templates werden **zur Erstellungszeit kombiniert**, nicht zur Laufzeit inkludiert.
+Templates are combined when creating a draft entry, not included dynamically at render time.
 
----
+## Design Principles
 
-## Workflow
+1. Minimal structure, enough to stay useful.
+2. Capture first, curate later.
+3. Git handles history and sync.
+4. Markdown stays readable without `k`.
+5. Scope is explicit context, not hidden magic.
 
-### Einstieg
+## Current Limits
 
-```bash
-k resume
-```
+- no GUI
+- no database
+- no cloud sync
+- no AI integration
+- no advanced task management
+- `find` is plain text search over repository content
+- `resume` is centered on the current day, not full history
 
-### Während der Arbeit
+## Future Developments
 
-```bash
-k jot "Gedanke"
-k jot --kind todo "Task"
-```
+Potential next steps:
+- filtered search by kind and scope
+- metadata-aware search for tags and frontmatter
+- guided scope suggestions and shell completion
+- promotion flows from journal to entry
 
-### Wissen festhalten
+## Summary
 
-```bash
-k new problem "..."
-k save
-```
-
-### Tagesabschluss
-
-```bash
-k wrap
-```
-
----
-
-## Designprinzipien
-
-### 1. Minimalismus
-
-So wenig Struktur wie möglich, so viel wie nötig.
-
-### 2. Append-first
-
-Erst erfassen, später strukturieren.
-
-### 3. Git-first
-
-Keine eigene Historie bauen.
-
-### 4. Tool-agnostisch
-
-Markdown bleibt lesbar ohne k.
-
-### 5. Kontext statt Magie
-
-Scope ersetzt implizite Intelligenz.
-
----
-
-## Erweiterungen (später)
-
-- Journal → Entry Promotion
-- bessere Suche
-- automatische Vorschläge
-- Analyse über Journal-Daten
-- optionale UI (z. B. Obsidian)
-
----
-
-## Fazit
-
-k ist:
-
-> ein leichtgewichtiges, git-basiertes CLI-System zur Erfassung und Strukturierung von Wissen mit Fokus auf tatsächliche Nutzung.
-
-Nicht mehr.
-Nicht weniger.
-
+`k` is a lightweight CLI knowledge system centered on Markdown, Git, scopes, and low-friction daily use.
