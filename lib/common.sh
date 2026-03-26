@@ -49,29 +49,35 @@ k_tool_root() {
   printf '%s\n' "$K_TOOL_ROOT"
 }
 
+k_local_root() {
+  printf '%s/.k\n' "$HOME"
+}
+
 k_default_repo_root() {
-  local path
-  path="$(k_setup_default_repo_path)"
-  path="${path/#\~/$HOME}"
-  printf '%s\n' "$path"
+  printf '%s/repo\n' "$(k_local_root)"
+}
+
+k_local_knowledge_dir() {
+  printf '%s/.knowledge\n' "$(k_local_root)"
 }
 
 k_repo_exists() {
   local repo_root
   repo_root="$(k_default_repo_root)"
-  [[ -d "$repo_root/.knowledge" ]]
+  [[ -d "$repo_root" && -d "$(k_knowledge_dir)" ]]
 }
 
 k_repo_root() {
   local root
   root="$(k_default_repo_root)"
-  [[ -d "$root/.knowledge" ]] || k_die "Knowledge repo not found at $root. Run 'k setup' first." 1
+  [[ -d "$root" ]] || k_die "Knowledge repo not found at $root. Run 'k setup' first." 1
+  [[ -d "$(k_knowledge_dir)" ]] || k_die "Local knowledge metadata not found at $(k_knowledge_dir). Run 'k setup' first." 1
   printf '%s\n' "$root"
 }
 
 k_has_repo() { k_repo_exists; }
 
-k_knowledge_dir() { printf '%s/.knowledge\n' "$(k_repo_root)"; }
+k_knowledge_dir() { printf '%s\n' "$(k_local_knowledge_dir)"; }
 k_config_file() { printf '%s/config\n' "$(k_knowledge_dir)"; }
 k_current_scope_file() { printf '%s/current_scope\n' "$(k_knowledge_dir)"; }
 k_scopes_file() { printf '%s/scopes.txt\n' "$(k_knowledge_dir)"; }

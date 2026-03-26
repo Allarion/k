@@ -9,10 +9,11 @@ k_setup_run() {
   local target="${1:-$(k_setup_default_repo_path)}"
   target="${target/#\~/$HOME}"
 
-  local anchor_dir repo_dir knowledge_dir scopes_file tags_file config_file current_scope_file
+  local anchor_dir repo_dir local_root knowledge_dir scopes_file tags_file config_file current_scope_file
   repo_dir="$target"
   anchor_dir="$(dirname "$repo_dir")"
-  knowledge_dir="$repo_dir/.knowledge"
+  local_root="$(k_local_root)"
+  knowledge_dir="$(k_knowledge_dir)"
   scopes_file="$knowledge_dir/scopes.txt"
   tags_file="$knowledge_dir/tags.txt"
   config_file="$knowledge_dir/config"
@@ -21,9 +22,10 @@ k_setup_run() {
   k_info "Starting knowledge repository setup"
   k_vinfo 1 "Host anchor directory: $anchor_dir"
   k_vinfo 1 "Target repository path: $repo_dir"
+  k_vinfo 1 "Local metadata path: $knowledge_dir"
   k_vinfo 2 "Tool root: $(k_tool_root)"
 
-  mkdir -p "$repo_dir"
+  mkdir -p "$repo_dir" "$local_root"
   k_vinfo 2 "Ensured directory exists: $repo_dir"
 
   if [[ -d "$repo_dir/.git" ]]; then
