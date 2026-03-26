@@ -23,7 +23,7 @@ k - git-based CLI knowledge system (bash v1)
 
 Usage:
   k [-v|-vv|-vvv] help
-  k [-v|-vv|-vvv] setup [path]
+  k [-v|-vv|-vvv] setup
   k scope list|show|use <scope>|clear
   k jot [--kind KIND] [--scope SCOPE] [--tags a,b,c] <text>
   k today [--edit]
@@ -38,7 +38,6 @@ Usage:
 
 Examples:
   k setup
-  k setup ~/.k/repo
   k scope use private/arx
   k jot "Traefik auth vermutlich Middleware-Name"
   k jot --kind question "Warum greift die Middleware nicht?"
@@ -73,8 +72,8 @@ require_repo_unless_setup() {
 }
 
 cmd_setup() {
-  local path="${1:-$(k_setup_default_repo_path)}"
-  k_setup_run "$path"
+  [[ $# -eq 0 ]] || k_die "Usage: k setup" 2
+  k_setup_run
 }
 
 cmd_scope() {

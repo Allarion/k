@@ -85,10 +85,9 @@ EOF_CONFIG
   if [[ ! -f "$scopes_file" ]]; then
     k_vinfo 1 "Writing default scopes"
     cat > "$scopes_file" <<'EOF_SCOPES'
-private/arx
-private/auxion
-private/printer
-work/bgprevent
+private/project1
+private/project2
+work/project1-work
 common/git
 common/traefik
 EOF_SCOPES
@@ -148,5 +147,5 @@ EOF_TAGS
   if [[ -n "$default_scope" ]]; then
     k_info "Default scope: $default_scope"
   fi
-  k_info "Next: cd $repo_dir && k scope use <domain/system>"
+  k_info "Next: k scope use <domain/system>"
 }

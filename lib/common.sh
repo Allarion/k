@@ -49,25 +49,27 @@ k_tool_root() {
   printf '%s\n' "$K_TOOL_ROOT"
 }
 
-k_find_repo_root() {
-  local dir="${PWD}"
-  while [[ "$dir" != "/" ]]; do
-    if [[ -d "$dir/.knowledge" ]]; then
-      printf '%s\n' "$dir"
-      return 0
-    fi
-    dir="$(dirname "$dir")"
-  done
-  return 1
+k_default_repo_root() {
+  local path
+  path="$(k_setup_default_repo_path)"
+  path="${path/#\~/$HOME}"
+  printf '%s\n' "$path"
+}
+
+k_repo_exists() {
+  local repo_root
+  repo_root="$(k_default_repo_root)"
+  [[ -d "$repo_root/.knowledge" ]]
 }
 
 k_repo_root() {
   local root
-  root="$(k_find_repo_root)" || k_die "No knowledge repo found (.knowledge missing). Run 'k setup' first or cd into a repo." 1
+  root="$(k_default_repo_root)"
+  [[ -d "$root/.knowledge" ]] || k_die "Knowledge repo not found at $root. Run 'k setup' first." 1
   printf '%s\n' "$root"
 }
 
-k_has_repo() { k_find_repo_root >/dev/null 2>&1; }
+k_has_repo() { k_repo_exists; }
 
 k_knowledge_dir() { printf '%s/.knowledge\n' "$(k_repo_root)"; }
 k_config_file() { printf '%s/config\n' "$(k_knowledge_dir)"; }
