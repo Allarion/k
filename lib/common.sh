@@ -1,5 +1,19 @@
 #!/usr/bin/env bash
 
+k_verbose=0
+
+k_set_verbosity() {
+  k_verbose="${1:-0}"
+}
+
+k_vinfo() {
+  local level="${1:-1}"
+  shift || true
+  if (( k_verbose >= level )); then
+    printf '[V%d] %s\n' "$level" "$*" >&2
+  fi
+}
+
 k_log() { printf '%s\n' "$*" >&2; }
 k_info() { printf '[INFO] %s\n' "$*" >&2; }
 k_warn() { printf '[WARN] %s\n' "$*" >&2; }
