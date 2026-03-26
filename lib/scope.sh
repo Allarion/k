@@ -30,11 +30,11 @@ k_scope_use() {
   if ! k_scope_exists "$scope"; then
     k_warn "Scope not found in scopes.txt: $scope"
   fi
-  k_write_file "$(k_current_scope_file)" "$scope"
+  k_current_scope_set "$scope"
   printf 'Active scope: %s\n' "$scope"
 }
 
 k_scope_clear() {
-  : > "$(k_current_scope_file)"
+  k_current_scope_clear
   printf 'Active scope cleared\n'
 }

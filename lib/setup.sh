@@ -43,6 +43,24 @@ k_setup_run() {
     fi
   fi
 
+  local origin_url
+  if [[ -d "$repo_dir/.git" ]]; then
+    if git -C "$repo_dir" remote get-url origin >/dev/null 2>&1; then
+      k_vinfo 1 "Origin remote already configured"
+      k_vinfo 2 "Existing origin: $(git -C "$repo_dir" remote get-url origin 2>/dev/null || true)"
+    else
+      printf 'Origin remote URL [optional]: '
+      IFS= read -r origin_url
+      if [[ -n "$origin_url" ]]; then
+        git -C "$repo_dir" remote add origin "$origin_url"
+        k_info "Configured git remote: origin"
+        k_vinfo 2 "Origin URL: $origin_url"
+      fi
+    fi
+  else
+    k_vinfo 1 "Skipping origin remote setup without git repository"
+  fi
+
   k_vinfo 1 "Creating directory structure"
   mkdir -p     "$knowledge_dir/templates"     "$repo_dir/journal"     "$repo_dir/drafts"     "$repo_dir/todos"     "$repo_dir/entries/problem"     "$repo_dir/entries/solution"     "$repo_dir/entries/insight"     "$repo_dir/entries/decision"     "$repo_dir/entries/idea"     "$repo_dir/entries/project"
 
@@ -97,7 +115,7 @@ EOF_TAGS
   fi
 
   if [[ ! -f "$current_scope_file" ]]; then
-    : > "$current_scope_file"
+    k_clear_file "$current_scope_file"
     k_vinfo 2 "Created current scope file"
   fi
 
@@ -110,31 +128,18 @@ EOF_TAGS
   printf 'Environment name [%s]: ' "$env_default"
   IFS= read -r env_name
   env_name="${env_name:-$env_default}"
-  sed -i "s/^DEVICE=.*/DEVICE="$(k_escape_sed_replacement "$env_name")"/" "$config_file"
+  k_config_set_in_file "$config_file" "DEVICE" "$env_name"
   k_vinfo 1 "Configured environment name: $env_name"
 
   local default_scope
   printf 'Default scope [optional]: '
   IFS= read -r default_scope
   if [[ -n "$default_scope" ]]; then
-    sed -i "s/^DEFAULT_SCOPE=.*/DEFAULT_SCOPE="$(k_escape_sed_replacement "$default_scope")"/" "$config_file"
-    printf '%s
-' "$default_scope" > "$current_scope_file"
+    k_config_set_in_file "$config_file" "DEFAULT_SCOPE" "$default_scope"
+    k_current_scope_set_in_file "$current_scope_file" "$default_scope"
     k_vinfo 1 "Configured default scope: $default_scope"
-  fi
-
-  local origin_url
-  printf 'Origin remote URL [optional]: '
-  IFS= read -r origin_url
-  if [[ -n "$origin_url" ]]; then
-    if git -C "$repo_dir" remote get-url origin >/dev/null 2>&1; then
-      k_warn "Origin remote already exists; keeping current value"
-      k_vinfo 2 "Existing origin: $(git -C "$repo_dir" remote get-url origin 2>/dev/null || true)"
-    else
-      git -C "$repo_dir" remote add origin "$origin_url"
-      k_info "Configured git remote: origin"
-      k_vinfo 2 "Origin URL: $origin_url"
-    fi
+  else
+    k_config_set_in_file "$config_file" "DEFAULT_SCOPE" ""
   fi
 
   k_info "Setup complete"

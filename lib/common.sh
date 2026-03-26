@@ -109,6 +109,51 @@ k_write_file() {
   printf '%s\n' "$*" > "$file"
 }
 
+k_clear_file() {
+  local file="$1"
+  mkdir -p "$(dirname "$file")"
+  : > "$file"
+}
+
+k_escape_sed_replacement() {
+  printf '%s' "$1" | sed -e 's/[\/&]/\\&/g'
+}
+
+k_config_set_in_file() {
+  local config_file="$1"
+  local key="$2"
+  local value="${3:-}"
+  mkdir -p "$(dirname "$config_file")"
+  [[ -f "$config_file" ]] || : > "$config_file"
+
+  if grep -Eq "^${key}=" "$config_file"; then
+    sed -i "s/^${key}=.*/${key}=\"$(k_escape_sed_replacement "$value")\"/" "$config_file"
+  else
+    printf '%s="%s"\n' "$key" "$value" >> "$config_file"
+  fi
+}
+
+k_config_set() {
+  local key="$1"
+  local value="${2:-}"
+  k_config_set_in_file "$(k_config_file)" "$key" "$value"
+}
+
+k_current_scope_set_in_file() {
+  local current_scope_file="$1"
+  local scope="$2"
+  k_write_file "$current_scope_file" "$scope"
+}
+
+k_current_scope_set() {
+  local scope="$1"
+  k_current_scope_set_in_file "$(k_current_scope_file)" "$scope"
+}
+
+k_current_scope_clear() {
+  k_clear_file "$(k_current_scope_file)"
+}
+
 k_append_line() {
   local file="$1"
   shift
@@ -205,8 +250,4 @@ k_find_latest_file() {
   local dir="$1"
   [[ -d "$dir" ]] || return 1
   find "$dir" -maxdepth 1 -type f -name '*.md' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-
-}
-
-k_escape_sed_replacement() {
-  printf '%s' "$1" | sed -e 's/[\/&]/\\&/g'
 }
