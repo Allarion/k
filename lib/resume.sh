@@ -4,11 +4,23 @@ k_resume_show() {
   local scope="$1"
   printf 'Scope: %s\n\n' "$scope"
 
-  printf 'Zuletzt:\n'
+  printf 'Todo Summary:\n'
+  printf -- '- %s\n' "$(k_todo_status_summary "$scope")"
+
+  printf '\nRecent Journal:\n'
   local recent
   recent="$(k_journal_last_scope_entries "$scope" 5 || true)"
   if [[ -n "$recent" ]]; then
     printf '%s\n' "$recent" | sed 's/^/- /'
+  else
+    printf '%s\n' '- none'
+  fi
+
+  printf '\nIn Progress:\n'
+  local progress_todos
+  progress_todos="$(k_todo_progress_titles "$scope" || true)"
+  if [[ -n "$progress_todos" ]]; then
+    printf '%s\n' "$progress_todos" | sed 's/^/- /'
   else
     printf '%s\n' '- none'
   fi
@@ -23,20 +35,26 @@ k_resume_show() {
   fi
 
   printf '\nDrafts:\n'
-  local drafts match=0 f dscope
-  if [[ -d "$(k_drafts_dir)" ]]; then
-    while IFS= read -r f; do
-      [[ -n "$f" ]] || continue
-      dscope="$(k_entry_frontmatter_get "$f" scope 2>/dev/null || true)"
-      if [[ "$dscope" == "$scope" ]]; then
-        printf -- '- %s\n' "$(basename "$f")"
-        match=1
-      fi
-    done < <(find "$(k_drafts_dir)" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort)
-  fi
+  local match=0 f
+  while IFS= read -r f; do
+    [[ -n "$f" ]] || continue
+    printf -- '- %s\n' "$(basename "$f")"
+    match=1
+  done < <(k_entry_list_scope_drafts "$scope")
   [[ "$match" -eq 1 ]] || printf '%s\n' '- none'
 
-  printf '\nLetzter Wrap:\n'
+  printf '\nLatest Entry:\n'
+  local latest_entry latest_type latest_title
+  latest_entry="$(k_entry_latest_for_scope "$scope" || true)"
+  if [[ -n "$latest_entry" ]]; then
+    latest_type="$(k_entry_frontmatter_get "$latest_entry" type)"
+    latest_title="$(k_entry_frontmatter_get "$latest_entry" title)"
+    printf -- '- [%s] %s\n' "$latest_type" "$latest_title"
+  else
+    printf '%s\n' '- none'
+  fi
+
+  printf '\nLatest Wrap:\n'
   local wrap
   wrap="$(k_journal_last_wrap || true)"
   if [[ -n "$wrap" ]]; then

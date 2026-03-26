@@ -42,6 +42,24 @@ k_entry_find_latest_draft() {
   k_find_latest_file "$(k_drafts_dir)"
 }
 
+k_entry_list_drafts() {
+  if [[ -d "$(k_drafts_dir)" ]]; then
+    find "$(k_drafts_dir)" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort -r
+  fi
+}
+
+k_entry_list_scope_drafts() {
+  local scope="$1"
+  local file dscope
+  while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
+    dscope="$(k_entry_frontmatter_get "$file" scope 2>/dev/null || true)"
+    if [[ -z "$scope" || "$dscope" == "$scope" ]]; then
+      printf '%s\n' "$file"
+    fi
+  done < <(k_entry_list_drafts)
+}
+
 k_entry_frontmatter_get() {
   local file="$1"
   local key="$2"
@@ -95,4 +113,17 @@ k_entry_finalize_draft() {
   mv "$file" "$target_file"
 
   printf '%s\n' "$target_file"
+}
+
+k_entry_latest_for_scope() {
+  local scope="$1"
+  local file
+  while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
+    if [[ "$(k_entry_frontmatter_get "$file" scope 2>/dev/null || true)" == "$scope" ]]; then
+      printf '%s\n' "$file"
+      return 0
+    fi
+  done < <(find "$(k_entries_dir)" -type f -name '*.md' 2>/dev/null | sort -r)
+  return 1
 }
