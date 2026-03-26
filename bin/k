@@ -25,25 +25,31 @@ Usage:
   k [-v|-vv|-vvv] help
   k [-v|-vv|-vvv] setup
   k scope list|show|use <scope>|clear
+  k draft list [--scope SCOPE]
   k jot [--kind KIND] [--scope SCOPE] [--tags a,b,c] <text>
   k today [--edit]
   k resume [--scope SCOPE]
   k new <type> <title> [--scope SCOPE] [--tags a,b,c] [--edit]
-  k save [--file draft.md] [--tags a,b,c]
+  k save [--latest|--file draft.md] [--tags a,b,c]
   k todo add <title> [--scope SCOPE] [--priority low|medium|high] [--tags a,b,c]
   k todo list [--scope SCOPE]
-  k todo done <index> [--scope SCOPE]
+  k todo start [index|0] [--scope SCOPE]
+  k todo done [index|0] [--scope SCOPE]
+  k todo reopen [index|0] [--scope SCOPE]
   k wrap
   k find <query>
 
 Examples:
   k setup
-  k scope use private/arx
+  k scope use private/project1
+  k draft list --scope private/project1
   k jot "Traefik auth vermutlich Middleware-Name"
   k jot --kind question "Warum greift die Middleware nicht?"
   k todo add "Middleware-Namen prüfen"
+  k todo start
+  k todo done 0
   k new problem "Traefik auth greift nicht" --edit
-  k save --tags infra,traefik,auth
+  k save --latest --tags infra,traefik,auth
   k wrap
 USAGE
 }
@@ -85,6 +91,40 @@ cmd_scope() {
     use) [[ $# -ge 1 ]] || k_die "Usage: k scope use <scope>" 2; k_scope_use "$1" ;;
     clear) k_scope_clear ;;
     *) k_die "Usage: k scope list|show|use <scope>|clear" 2 ;;
+  esac
+}
+
+cmd_draft() {
+  local sub="${1:-}"
+  shift || true
+  case "$sub" in
+    list)
+      local scope=""
+      if [[ "${1:-}" == "--scope" ]]; then
+        [[ $# -ge 2 ]] || k_die "Usage: k draft list [--scope SCOPE]" 2
+        scope="$2"
+        shift 2
+      fi
+      [[ $# -eq 0 ]] || k_die "Usage: k draft list [--scope SCOPE]" 2
+      local file type title draft_scope index=1 found=0
+      while IFS= read -r file; do
+        [[ -n "$file" ]] || continue
+        type="$(k_entry_frontmatter_get "$file" type)"
+        title="$(k_entry_frontmatter_get "$file" title)"
+        draft_scope="$(k_entry_frontmatter_get "$file" scope)"
+        printf '%d. [%s] %s' "$index" "$type" "$title"
+        if [[ -n "$draft_scope" ]]; then
+          printf ' (%s)' "$draft_scope"
+        fi
+        printf ' -> %s\n' "$(basename "$file")"
+        index=$((index + 1))
+        found=1
+      done < <(k_entry_list_scope_drafts "$scope")
+      [[ "$found" -eq 1 ]] || printf 'No drafts found\n'
+      ;;
+    *)
+      k_die "Usage: k draft list [--scope SCOPE]" 2
+      ;;
   esac
 }
 
@@ -147,15 +187,17 @@ cmd_new() {
 }
 
 cmd_save() {
-  local file="" tags=""
+  local file="" tags="" use_latest="false"
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --file) file="$2"; shift 2 ;;
+      --latest) use_latest="true"; shift ;;
       --tags) tags="$2"; shift 2 ;;
       --*) k_die "Unknown option: $1" 2 ;;
       *) k_die "Unexpected argument: $1" 2 ;;
     esac
   done
+  [[ "$use_latest" == "true" && -n "$file" ]] && k_die "Use either --latest or --file" 2
   [[ -n "$file" ]] || file="$(k_entry_find_latest_draft || true)"
   [[ -n "$file" ]] || k_die "No draft found" 4
   local final_file type title normalized_tags msg
@@ -197,26 +239,73 @@ cmd_todo() {
     list)
       local scope=""
       if [[ "${1:-}" == "--scope" ]]; then
+        [[ $# -ge 2 ]] || k_die "Usage: k todo list [--scope SCOPE]" 2
         scope="$2"
+        shift 2
       fi
+      [[ $# -eq 0 ]] || k_die "Usage: k todo list [--scope SCOPE]" 2
       [[ -n "$scope" ]] || scope="$(k_require_scope)"
       k_todo_list "$scope"
       ;;
-    done)
-      local index="${1:-}"; shift || true
-      [[ -n "$index" ]] || k_die "Usage: k todo done <index> [--scope SCOPE]" 2
+    start)
+      local index="0"
+      if [[ $# -gt 0 && "${1:-}" != "--scope" ]]; then
+        index="$1"
+        shift || true
+      fi
       local scope=""
       if [[ "${1:-}" == "--scope" ]]; then
+        [[ $# -ge 2 ]] || k_die "Usage: k todo start [index|0] [--scope SCOPE]" 2
         scope="$2"
+        shift 2
       fi
+      [[ $# -eq 0 ]] || k_die "Usage: k todo start [index|0] [--scope SCOPE]" 2
+      [[ -n "$scope" ]] || scope="$(k_require_scope)"
+      local started_title
+      started_title="$(k_todo_start_by_index "$scope" "$index")"
+      k_git_commit_if_enabled "todo(start): $started_title"
+      printf 'Started in %s: %s\n' "$scope" "$started_title"
+      ;;
+    done)
+      local index="0"
+      if [[ $# -gt 0 && "${1:-}" != "--scope" ]]; then
+        index="$1"
+        shift || true
+      fi
+      local scope=""
+      if [[ "${1:-}" == "--scope" ]]; then
+        [[ $# -ge 2 ]] || k_die "Usage: k todo done [index|0] [--scope SCOPE]" 2
+        scope="$2"
+        shift 2
+      fi
+      [[ $# -eq 0 ]] || k_die "Usage: k todo done [index|0] [--scope SCOPE]" 2
       [[ -n "$scope" ]] || scope="$(k_require_scope)"
       local done_title
       done_title="$(k_todo_done_by_index "$scope" "$index")"
       k_git_commit_if_enabled "todo(done): $done_title"
       printf 'Done in %s: %s\n' "$scope" "$done_title"
       ;;
+    reopen)
+      local index="0"
+      if [[ $# -gt 0 && "${1:-}" != "--scope" ]]; then
+        index="$1"
+        shift || true
+      fi
+      local scope=""
+      if [[ "${1:-}" == "--scope" ]]; then
+        [[ $# -ge 2 ]] || k_die "Usage: k todo reopen [index|0] [--scope SCOPE]" 2
+        scope="$2"
+        shift 2
+      fi
+      [[ $# -eq 0 ]] || k_die "Usage: k todo reopen [index|0] [--scope SCOPE]" 2
+      [[ -n "$scope" ]] || scope="$(k_require_scope)"
+      local reopened_title
+      reopened_title="$(k_todo_reopen_by_index "$scope" "$index")"
+      k_git_commit_if_enabled "todo(reopen): $reopened_title"
+      printf 'Reopened in %s: %s\n' "$scope" "$reopened_title"
+      ;;
     *)
-      k_die "Usage: k todo add|list|done ..." 2
+      k_die "Usage: k todo add|list|start|done|reopen ..." 2
       ;;
   esac
 }
@@ -252,6 +341,7 @@ main() {
     help|-h|--help) usage ;;
     setup) cmd_setup "$@" ;;
     scope) cmd_scope "$@" ;;
+    draft) cmd_draft "$@" ;;
     jot) cmd_jot "$@" ;;
     today) cmd_today "$@" ;;
     resume) cmd_resume "$@" ;;
