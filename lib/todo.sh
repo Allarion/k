@@ -269,7 +269,7 @@ k_todo_move_by_index() {
 k_todo_done_by_index() {
   local scope="$1"
   local index="${2:-0}"
-  if [[ "$(k_todo_section_count "$scope" progress")" -gt 0 ]]; then
+  if [[ "$(k_todo_section_count "$scope" progress)" -gt 0 ]]; then
     k_todo_move_by_index "$scope" progress done "$index"
   else
     k_todo_move_by_index "$scope" open done "$index"
