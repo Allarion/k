@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "k-mcp"
+version = "0.1.0"
+description = "Local stdio MCP adapter and migration helper around the existing k CLI"
+readme = "k_mcp/README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+k-mcp = "k_mcp.app.server:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["k_mcp*"]
