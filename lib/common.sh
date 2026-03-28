@@ -80,8 +80,8 @@ k_has_repo() { k_repo_exists; }
 k_knowledge_dir() { printf '%s\n' "$(k_local_knowledge_dir)"; }
 k_config_file() { printf '%s/config\n' "$(k_knowledge_dir)"; }
 k_current_scope_file() { printf '%s/current_scope\n' "$(k_knowledge_dir)"; }
-k_scopes_file() { printf '%s/scopes.txt\n' "$(k_knowledge_dir)"; }
-k_tags_file() { printf '%s/tags.txt\n' "$(k_knowledge_dir)"; }
+k_scopes_file() { printf '%s/scopes.txt\n' "$(k_repo_root)"; }
+k_tags_file() { printf '%s/tags.txt\n' "$(k_repo_root)"; }
 k_templates_dir() { printf '%s/templates\n' "$(k_knowledge_dir)"; }
 k_journal_dir() { printf '%s/journal\n' "$(k_repo_root)"; }
 k_entries_dir() { printf '%s/entries\n' "$(k_repo_root)"; }

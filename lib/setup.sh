@@ -10,12 +10,15 @@ k_setup_run() {
   target="${target/#\~/$HOME}"
 
   local anchor_dir repo_dir local_root knowledge_dir scopes_file tags_file config_file current_scope_file
+  local legacy_scopes_file legacy_tags_file
   repo_dir="$target"
   anchor_dir="$(dirname "$repo_dir")"
   local_root="$(k_local_root)"
   knowledge_dir="$(k_knowledge_dir)"
-  scopes_file="$knowledge_dir/scopes.txt"
-  tags_file="$knowledge_dir/tags.txt"
+  scopes_file="$repo_dir/scopes.txt"
+  tags_file="$repo_dir/tags.txt"
+  legacy_scopes_file="$knowledge_dir/scopes.txt"
+  legacy_tags_file="$knowledge_dir/tags.txt"
   config_file="$knowledge_dir/config"
   current_scope_file="$knowledge_dir/current_scope"
 
@@ -23,6 +26,7 @@ k_setup_run() {
   k_vinfo 1 "Host anchor directory: $anchor_dir"
   k_vinfo 1 "Target repository path: $repo_dir"
   k_vinfo 1 "Local metadata path: $knowledge_dir"
+  k_vinfo 1 "Repository config files: $repo_dir/scopes.txt, $repo_dir/tags.txt"
   k_vinfo 2 "Tool root: $(k_tool_root)"
 
   mkdir -p "$repo_dir" "$local_root"
@@ -71,6 +75,8 @@ k_setup_run() {
   k_vinfo 2 "Journal dir: $repo_dir/journal"
   k_vinfo 2 "Todos dir: $repo_dir/todos"
   k_vinfo 2 "Drafts dir: $repo_dir/drafts"
+  k_vinfo 2 "Scopes file: $scopes_file"
+  k_vinfo 2 "Tags file: $tags_file"
 
   if [[ ! -f "$config_file" ]]; then
     k_vinfo 1 "Writing default config"
@@ -85,21 +91,30 @@ EOF_CONFIG
   fi
 
   if [[ ! -f "$scopes_file" ]]; then
-    k_vinfo 1 "Writing default scopes"
-    cat > "$scopes_file" <<'EOF_SCOPES'
+    if [[ -f "$legacy_scopes_file" ]]; then
+      k_vinfo 1 "Migrating scopes file from local metadata to repo"
+      cp "$legacy_scopes_file" "$scopes_file"
+    else
+      k_vinfo 1 "Writing default scopes"
+      cat > "$scopes_file" <<'EOF_SCOPES'
 private/project1
 private/project2
 work/project1-work
 common/git
 common/traefik
 EOF_SCOPES
+    fi
   else
     k_vinfo 1 "Keeping existing scopes file"
   fi
 
   if [[ ! -f "$tags_file" ]]; then
-    k_vinfo 1 "Writing default tags"
-    cat > "$tags_file" <<'EOF_TAGS'
+    if [[ -f "$legacy_tags_file" ]]; then
+      k_vinfo 1 "Migrating tags file from local metadata to repo"
+      cp "$legacy_tags_file" "$tags_file"
+    else
+      k_vinfo 1 "Writing default tags"
+      cat > "$tags_file" <<'EOF_TAGS'
 infra
 traefik
 auth
@@ -111,6 +126,7 @@ printer
 linux
 bash
 EOF_TAGS
+    fi
   else
     k_vinfo 1 "Keeping existing tags file"
   fi

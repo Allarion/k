@@ -38,12 +38,18 @@ Local metadata lives in `~/.k/.knowledge`:
 ~/.k/.knowledge/
   config
   current_scope
-  scopes.txt
-  tags.txt
   templates/
 ```
 
-`.knowledge` is local configuration and metadata.
+Repository-level shared metadata lives in `~/.k/repo`:
+
+```text
+~/.k/repo/
+  scopes.txt
+  tags.txt
+```
+
+`.knowledge` is local machine-specific state and editor/config metadata.
 
 ## Concepts
 
