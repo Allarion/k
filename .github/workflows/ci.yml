@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  shell:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax check
+        run: |
+          while IFS= read -r file; do
+            bash -n "$file"
+          done < <(find bin lib tests -type f \( -name '*.sh' -o -path 'bin/k' \) | sort)
+
+      - name: CLI smoke tests
+        run: bash tests/test_cli.sh
