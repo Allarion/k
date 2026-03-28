@@ -257,6 +257,14 @@ Templates are combined when creating a draft entry, not included dynamically at 
 - `find` is plain text search over repository content
 - `resume` is centered on the current day, not full history
 
+## Testing
+
+Run the local smoke tests with:
+
+```bash
+bash tests/test_cli.sh
+```
+
 ## Future Developments
 
 Potential next steps:
