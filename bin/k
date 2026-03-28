@@ -417,7 +417,7 @@ EOF_COMPLETION
 cmd_completion() {
   local shell_name="${1:-}"
   case "$shell_name" in
-    bash)  ;;
+    bash) print_bash_completion ;;
     *) k_die "Usage: k completion bash" 2 ;;
   esac
 }
