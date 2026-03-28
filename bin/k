@@ -17,13 +17,15 @@ source "${LIB_DIR}/resume.sh"
 source "${LIB_DIR}/setup.sh"
 source "${LIB_DIR}/find.sh"
 
-usage() {
+print_help_main() {
   cat <<'USAGE'
 k - git-based CLI knowledge system (bash v1)
 
 Usage:
   k [-v|-vv|-vvv] help
+  k [-v|-vv|-vvv] help <command>
   k [-v|-vv|-vvv] setup
+  k completion bash
   k scope list|show|use <scope>|clear
   k draft list [--scope SCOPE]
   k jot [--kind KIND] [--scope SCOPE] [--tags a,b,c] <text>
@@ -39,6 +41,21 @@ Usage:
   k wrap
   k find <query>
 
+Commands:
+  help        show general or command-specific help
+  setup       initialize the local knowledge repository
+  completion  print shell completion scripts
+  scope       manage the active scope
+  draft       inspect draft entries
+  jot         append a quick journal note
+  today       show or edit today's journal file
+  resume      show current working context for a scope
+  new         create a structured draft entry
+  save        finalize a draft entry
+  todo        manage scope-based todos
+  wrap        append a daily wrap-up note
+  find        run text search across the knowledge repo
+
 Examples:
   k setup
   k scope use private/project1
@@ -51,7 +68,379 @@ Examples:
   k new problem "Traefik auth greift nicht" --edit
   k save --latest --tags infra,traefik,auth
   k wrap
+
+More:
+  k help todo
+  k help completion
 USAGE
+}
+
+print_help_setup() {
+  cat <<'USAGE'
+Usage:
+  k setup
+
+Description:
+  Creates the repository structure in ~/.k/repo and local metadata in ~/.k/.knowledge.
+  The command can initialize git, configure the origin remote, install templates,
+  and set a default scope.
+
+Examples:
+  k setup
+  k -vv setup
+USAGE
+}
+
+print_help_completion() {
+  cat <<'USAGE'
+Usage:
+  k completion bash
+
+Description:
+  Prints a Bash completion script for `k`. Source it in the current shell or load
+  it from your shell startup file.
+
+Examples:
+  source <(k completion bash)
+  k completion bash > ~/.k-completion.bash
+  echo 'source ~/.k-completion.bash' >> ~/.bashrc
+
+Notes:
+  The completion suggests commands, subcommands, options, entry types, and known scopes.
+  Dynamic values such as scopes are read from ~/.k/.knowledge when available.
+USAGE
+}
+
+print_help_scope() {
+  cat <<'USAGE'
+Usage:
+  k scope list
+  k scope show
+  k scope use <scope>
+  k scope clear
+
+Description:
+  Scope is the context anchor for most commands. The typical format is <domain>/<system>.
+  If no explicit --scope is passed to commands like `jot`, `resume`, `new`, or `todo`,
+  the active scope is used.
+
+Examples:
+  k scope list
+  k scope use work/project1-work
+  k scope show
+  k scope clear
+USAGE
+}
+
+print_help_draft() {
+  cat <<'USAGE'
+Usage:
+  k draft list [--scope SCOPE]
+
+Description:
+  Lists draft entries waiting to be finalized. With --scope, only drafts for that scope
+  are shown.
+
+Examples:
+  k draft list
+  k draft list --scope common/git
+USAGE
+}
+
+print_help_jot() {
+  cat <<'USAGE'
+Usage:
+  k jot [--kind KIND] [--scope SCOPE] [--tags a,b,c] <text>
+
+Description:
+  Appends a low-friction note to today's journal file. Default kind is `note`.
+  Supported kinds: note, question, todo.
+
+Examples:
+  k jot "Quick observation"
+  k jot --kind question "Why does this middleware not match?"
+  k jot --kind todo --scope work/project1-work --tags infra,auth "Check middleware name"
+USAGE
+}
+
+print_help_today() {
+  cat <<'USAGE'
+Usage:
+  k today [--edit]
+
+Description:
+  Shows today's journal entry or opens it in the configured editor.
+
+Examples:
+  k today
+  k today --edit
+USAGE
+}
+
+print_help_resume() {
+  cat <<'USAGE'
+Usage:
+  k resume [--scope SCOPE]
+
+Description:
+  Shows a compact working summary for a scope: todo counts, in-progress work,
+  today's journal lines, matching drafts, the latest entry, and the latest wrap.
+
+Examples:
+  k resume
+  k resume --scope common/git
+USAGE
+}
+
+print_help_new() {
+  cat <<'USAGE'
+Usage:
+  k new <type> <title> [--scope SCOPE] [--tags a,b,c] [--edit]
+
+Description:
+  Creates a draft entry from templates. Supported types: problem, solution, insight,
+  decision, idea, project.
+
+Examples:
+  k new problem "Traefik auth greift nicht"
+  k new solution "JWT middleware chain" --scope common/traefik --tags infra,auth --edit
+USAGE
+}
+
+print_help_save() {
+  cat <<'USAGE'
+Usage:
+  k save [--latest|--file draft.md] [--tags a,b,c]
+
+Description:
+  Finalizes a draft entry and writes it to the structured entries area. Use either
+  --latest or --file to choose the source draft.
+
+Examples:
+  k save --latest
+  k save --latest --tags infra,auth
+  k save --file ~/.k/repo/drafts/2026-03-26-1015-sample.md
+USAGE
+}
+
+print_help_todo() {
+  cat <<'USAGE'
+Usage:
+  k todo add <title> [--scope SCOPE] [--priority low|medium|high] [--tags a,b,c]
+  k todo list [--scope SCOPE]
+  k todo start [index|0] [--scope SCOPE]
+  k todo done [index|0] [--scope SCOPE]
+  k todo reopen [index|0] [--scope SCOPE]
+
+Description:
+  Manages scope-based todos in three sections: Open, In Progress, and Done.
+  Index 0 is treated as the default and resolves to the first matching item.
+  `done` prefers an in-progress todo first; if none exists, it takes the first open todo.
+
+Examples:
+  k todo add "Investigate auth issue"
+  k todo add "Review retry strategy" --scope work/project1-work --priority high --tags infra,auth
+  k todo list
+  k todo start
+  k todo done 0
+  k todo reopen 1 --scope work/project1-work
+USAGE
+}
+
+print_help_wrap() {
+  cat <<'USAGE'
+Usage:
+  k wrap
+
+Description:
+  Prompts for progress, open work, and the next step, then appends a daily wrap note.
+
+Examples:
+  k wrap
+USAGE
+}
+
+print_help_find() {
+  cat <<'USAGE'
+Usage:
+  k find <query>
+
+Description:
+  Runs plain text search across the knowledge repository.
+
+Examples:
+  k find middleware
+  k find "outbox retry"
+USAGE
+}
+
+usage() {
+  local topic="${1:-}"
+  case "$topic" in
+    ""|main|general) print_help_main ;;
+    setup) print_help_setup ;;
+    completion) print_help_completion ;;
+    scope) print_help_scope ;;
+    draft) print_help_draft ;;
+    jot) print_help_jot ;;
+    today) print_help_today ;;
+    resume) print_help_resume ;;
+    new) print_help_new ;;
+    save) print_help_save ;;
+    todo) print_help_todo ;;
+    wrap) print_help_wrap ;;
+    find) print_help_find ;;
+    *) k_die "Unknown help topic: $topic" 2 ;;
+  esac
+}
+
+k_completion_scopes() {
+  if k_has_repo; then
+    k_scope_list
+  fi
+}
+
+k_completion_drafts() {
+  if k_has_repo; then
+    local dir
+    dir="$(k_drafts_dir)"
+    [[ -d "$dir" ]] || return 0
+    find "$dir" -maxdepth 1 -type f -name '*.md' -printf '%p\n' 2>/dev/null
+  fi
+}
+
+k_emit_completions() {
+  local cmd1="${1:-}" cmd2="${2:-}" prev="${3:-}" cur="${4:-}"
+
+  if [[ "$prev" == "--scope" ]]; then
+    k_completion_scopes
+    return 0
+  fi
+
+  if [[ "$prev" == "--priority" ]]; then
+    printf '%s\n' low medium high
+    return 0
+  fi
+
+  if [[ "$prev" == "--kind" ]]; then
+    printf '%s\n' note question todo
+    return 0
+  fi
+
+  if [[ "$prev" == "--file" ]]; then
+    k_completion_drafts
+    return 0
+  fi
+
+  case "$cmd1" in
+    ""|help)
+      printf '%s\n' help setup completion scope draft jot today resume new save todo wrap find
+      ;;
+    completion)
+      printf '%s\n' bash
+      ;;
+    scope)
+      if [[ -z "$cmd2" ]]; then
+        printf '%s\n' list show use clear
+      elif [[ "$cmd2" == "use" ]]; then
+        k_completion_scopes
+      fi
+      ;;
+    draft)
+      if [[ -z "$cmd2" ]]; then
+        printf '%s\n' list
+      elif [[ "$cmd2" == "list" ]]; then
+        printf '%s\n' --scope
+      fi
+      ;;
+    jot)
+      if [[ "$cur" == --* ]]; then
+        printf '%s\n' --kind --scope --tags
+      else
+        printf '%s\n' --kind --scope --tags
+      fi
+      ;;
+    today)
+      printf '%s\n' --edit
+      ;;
+    resume)
+      printf '%s\n' --scope
+      ;;
+    new)
+      if [[ -z "$cmd2" ]]; then
+        printf '%s\n' problem solution insight decision idea project
+      else
+        printf '%s\n' --scope --tags --edit
+      fi
+      ;;
+    save)
+      printf '%s\n' --latest --file --tags
+      ;;
+    todo)
+      if [[ -z "$cmd2" ]]; then
+        printf '%s\n' add list start done reopen
+      else
+        case "$cmd2" in
+          add) printf '%s\n' --scope --priority --tags ;;
+          list) printf '%s\n' --scope ;;
+          start|done|reopen) printf '%s\n' 0 1 2 3 4 5 --scope ;;
+        esac
+      fi
+      ;;
+    wrap)
+      ;;
+    find)
+      ;;
+  esac
+}
+
+print_bash_completion() {
+  cat <<'EOF_COMPLETION'
+_k_completion() {
+  local cur prev words cword
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev=""
+  if (( COMP_CWORD > 0 )); then
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+  fi
+
+  local output
+  output="$(k __complete "${COMP_WORDS[@]:1}")" || return 0
+  COMPREPLY=($(compgen -W "$output" -- "$cur"))
+}
+
+complete -F _k_completion k
+EOF_COMPLETION
+}
+
+cmd_completion() {
+  local shell_name="${1:-}"
+  case "$shell_name" in
+    bash)  ;;
+    *) k_die "Usage: k completion bash" 2 ;;
+  esac
+}
+
+cmd_complete() {
+  local words=("$@")
+  local count="${#words[@]}"
+  local cur="" prev="" cmd1="" cmd2=""
+
+  if (( count > 0 )); then
+    cur="${words[count-1]}"
+  fi
+  if (( count > 1 )); then
+    prev="${words[count-2]}"
+  fi
+  if (( count > 0 )); then
+    cmd1="${words[0]}"
+  fi
+  if (( count > 1 )); then
+    cmd2="${words[1]}"
+  fi
+
+  k_emit_completions "$cmd1" "$cmd2" "$prev" "$cur"
 }
 
 parse_global_options() {
@@ -72,7 +461,7 @@ parse_global_options() {
 require_repo_unless_setup() {
   local cmd="$1"
   case "$cmd" in
-    help|-h|--help|setup) return 0 ;;
+    help|-h|--help|setup|completion|__complete) return 0 ;;
     *) k_repo_root >/dev/null ;;
   esac
 }
@@ -338,8 +727,10 @@ main() {
   shift || true
   require_repo_unless_setup "$cmd"
   case "$cmd" in
-    help|-h|--help) usage ;;
+    help|-h|--help) usage "${1:-}" ;;
     setup) cmd_setup "$@" ;;
+    completion) cmd_completion "$@" ;;
+    __complete) cmd_complete "$@" ;;
     scope) cmd_scope "$@" ;;
     draft) cmd_draft "$@" ;;
     jot) cmd_jot "$@" ;;

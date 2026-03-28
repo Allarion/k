@@ -101,6 +101,10 @@ Examples:
 ## Commands
 
 ```bash
+k help
+k help todo
+k completion bash
+
 k setup
 
 k scope list
@@ -140,6 +144,19 @@ Global verbosity flags:
 k -v setup
 k -vv setup
 k -vvv setup
+```
+
+Shell completion for Bash:
+
+```bash
+source <(k completion bash)
+```
+
+Or persist it:
+
+```bash
+k completion bash > ~/.k-completion.bash
+echo 'source ~/.k-completion.bash' >> ~/.bashrc
 ```
 
 ## Current Workflow
